@@ -1,0 +1,212 @@
+<!DOCTYPE HTML><html>
+<head>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <script src="https://code.highcharts.com/highcharts.js"></script>  
+  <link rel="stylesheet" type="text/css" href="style.css">
+</head>
+<body>
+  <h2>Ventilator</h2>
+  <div id="chart-flow" class="container"></div>
+  <div id="chart-volume" class="container"></div>
+  <div id="chart-pressure" class="container"></div>
+  <div id="chart-oxygen" class="container"></div>
+  <p><button onclick="valve_1()" class="button" id="valve_1">Valve 1 close</button></p>
+  <p><button onclick="valve_2()" class="button" id="valve_2">Valve 2 close</button></p>
+</body>
+<script>
+  //Flow rate chart
+  var chartF = new Highcharts.Chart({
+    chart:{ renderTo : 'chart-flow',
+            type:'spline', 
+            animation:false },
+    title: { text: 'Flow rate' },
+    series: [{
+      showInLegend: false,
+      data: []
+    }],
+    plotOptions: {
+      line: { animation: false,
+        dataLabels: { enabled: false }
+      },
+      series: { color: '#059e8a' }
+    },
+    xAxis: { type: 'linear'
+    },
+    yAxis: {
+      title: { text: 'units' }
+    },
+    credits: { enabled: false }
+  });
+  
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+          var  y = parseFloat(this.responseText);
+        if(chartF.series[0].data.length > 100) {
+          chartF.series[0].addPoint(y, true, true, true);
+        } else {
+          chartF.series[0].addPoint(y, true, false, true);
+        }
+      }
+    };
+    xhttp.open("GET", "/flow", true);
+    xhttp.send();
+  }, 200 ) ;
+
+  //Volume chart
+  var chartV = new Highcharts.Chart({
+    chart:{ renderTo : 'chart-volume',
+            type:'spline',
+            animation: false },
+    title: { text: 'Volume' },
+    series: [{
+      showInLegend: false,
+      data: []
+    }],
+    plotOptions: {
+      line: { animation: false,
+        dataLabels: { enabled: false }
+      },
+      series: { color: '#059e8a' }
+    },
+    xAxis: { type: 'linear'
+    },
+    yAxis: {
+      title: { text: 'units' }
+    },
+    credits: { enabled: false }
+  });
+  
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        var  y = parseFloat(this.responseText);
+        //console.log(this.responseText);
+        if(chartV.series[0].data.length > 100) {
+          chartV.series[0].addPoint( y, true, true, true);
+        } else {
+          chartV.series[0].addPoint(y, true, false, true);
+        }
+      }
+    };
+    xhttp.open("GET", "/volume", true);
+    xhttp.send();
+  }, 200 ) ;
+
+  //Pressure chart
+  var chartP = new Highcharts.Chart({
+    chart:{ renderTo : 'chart-pressure',
+            type:'spline',
+            animation: false },
+    title: { text: 'Pressure' },
+    series: [{
+      showInLegend: false,
+      data: []
+    }],
+    plotOptions: {
+      line: { animation: false,
+        dataLabels: { enabled: false }
+      },
+      series: { color: '#059e8a' }
+    },
+    xAxis: { type: 'linear'
+    },
+    yAxis: {
+      title: { text: 'units' }
+    },
+    credits: { enabled: false }
+  });
+  
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        var  y = parseFloat(this.responseText);
+        if(chartP.series[0].data.length > 100) {
+          chartP.series[0].addPoint(y, true, true, true);
+        } else {
+          chartP.series[0].addPoint(y, true, false, true);
+        }
+      }
+    };
+    xhttp.open("GET", "/pressure", true);
+    xhttp.send();
+  }, 200 ) ;
+
+  //Oxygen concentration chart
+  var chartO = new Highcharts.Chart({
+    chart:{ renderTo : 'chart-oxygen',
+            type:'spline',
+            animation: false },
+    title: { text: 'Oxygen Conc.' },
+    series: [{
+      showInLegend: false,
+      data: []
+    }],
+    plotOptions: {
+      line: { animation: false,
+        dataLabels: { enabled: false }
+      },
+      series: { color: '#059e8a' }
+    },
+    xAxis: { type: 'linear',
+    },
+    yAxis: {
+      title: { text: 'units' }
+    },
+    credits: { enabled: false }
+  });
+  
+  setInterval(function ( ) {
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function() {
+      if (this.readyState == 4 && this.status == 200) {
+        var  y = parseFloat(this.responseText);
+        if(chartO.series[0].data.length > 100) {
+          chartO.series[0].addPoint(y, true, true, true);
+        } else {
+          chartO.series[0].addPoint(y, true, false, true);
+        }
+      }
+    };
+    xhttp.open("GET", "/oxygen", true);
+    xhttp.send();
+  }, 200 ) ;
+
+  function valve_1(){
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function(){
+      if(this.readyState == 4 && this.status == 200){
+        if(parseInt(this.responseText) == 1){
+          document.querySelector('#valve_1').textContent = "Valve 1 Open";
+        }
+        else{
+          document.querySelector('#valve_1').textContent = "Valve 1 Close";
+        }
+      }
+    };
+    xhttp.open("GET", "/valve_1", true);
+    xhttp.send();
+  }
+
+  function valve_2(){;
+    var xhttp = new XMLHttpRequest();
+    xhttp.onreadystatechange = function(){
+      if(this.readyState == 4 && this.status == 200){
+        if(parseInt(this.responseText) == 1){
+          document.querySelector('#valve_2').textContent = "Valve 2 Open";
+        }
+        else{
+          document.querySelector('#valve_2').textContent = "Valve 2 Close";
+        }
+      }
+    };
+    xhttp.open("GET", "/valve_2", true);
+    xhttp.send();
+  }
+
+
+</script>
+</html>

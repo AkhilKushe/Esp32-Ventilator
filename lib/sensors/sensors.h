@@ -5,7 +5,14 @@
 #include <SPI.h>
 #include "Adafruit_ADS1015.h"
 
-void sensor_begin(int8_t sda_ = 21, int8_t scl_ = 22, uint32_t frequency_ = 1000000U);
+
+/*!
+*@brief Initialize Wire Library for sensors
+*@param sda default 21
+*@param scl default 22
+*@param frequency default 100KHz
+*/
+void sensor_begin(int8_t sda_ = 21, int8_t scl_ = 22, uint32_t frequency_ = 100000U);
 
 /*!
 *@brief Oxygen concentration sensor config structure 
@@ -20,6 +27,10 @@ typedef struct _Oxy_config_t{
 
 /*!
 *@brief Blower config structure for SPI pin configuration
+*@param MOSI
+*@param MISO
+*@param CS
+*@param clk
 */
 typedef struct _Blower_config{
     int8_t MISO;
@@ -30,6 +41,11 @@ typedef struct _Blower_config{
 
 enum error {I2C_ERROR = 0};
 
+
+/*!
+*@brief Flow sensor class to get reading (RAW/Processed)
+*@param Address of flow sensor
+*/
 class Flow_sensor{
     protected:
     uint8_t address;
@@ -47,6 +63,10 @@ class Flow_sensor{
 
 };
 
+/*!
+*@brief Pressure sensor class to get reading (RAW/Processed)
+*@param Address of pressure sensor
+*/
 class Pressure_sensor{
     protected:
     uint8_t address;
@@ -58,6 +78,10 @@ class Pressure_sensor{
 
 };
 
+/*!
+*@brief oxygen sensor class to get reading (RAW/Processed)
+*@param oxy_config_t oxygen configuration structure
+*/
 class Oxy_sensor{
     protected:
     oxy_config_t config;
@@ -70,6 +94,11 @@ class Oxy_sensor{
 
 };
 
+
+/*!
+*@brief Blower control with SPI interface
+*@param blower_config_t blower configuration structure
+*/
 class Blower{
     protected:
     blower_config_t config;
@@ -82,6 +111,10 @@ class Blower{
     void stop();
 };
 
+/*!
+*@brief Blower control with I2C interface
+*@param address blower i2c address
+*/
 class Blower_i2c{
     protected:
     uint8_t address;
@@ -93,6 +126,10 @@ class Blower_i2c{
     void stop();
 };
 
+/*!
+*@brief Value open/close/toggle control
+*@param _pinNum pin Number connected to valve
+*/
 class Valve{
     private:
     bool pinState;

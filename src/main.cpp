@@ -7,6 +7,7 @@
 // #define spi_clk 26
 // #define spi_mosi 27
 // #define spi_miso 14
+// Change the blower i2c bus
 
 #define i2c_sda 21
 #define i2c_scl 22
@@ -17,7 +18,8 @@
 #define ADS1115ADDRESS 0x48
 #define flowAddress 0x40
 #define pressureAddr 0x28
-#define BlowerAddress 0x00
+#define BlowerAddress 0x60
+
 // Replace with your network credentials
 const char* ssid = "abcd";
 const char* password = "qwertyui";
@@ -29,6 +31,7 @@ SemaphoreHandle_t mutex;
 QueueHandle_t s_data;
 TaskHandle_t flow_handle = NULL;
 bool flow_flag = false;
+float req_flow;
 
 
 typedef struct sensor_data_t{
@@ -49,6 +52,7 @@ Valve v2(valve_2);
 Flow_sensor flow(flowAddress);
 Oxy_sensor oxy(oxy_config);
 Pressure_sensor P(pressureAddr);
+Blower_i2c blower(BlowerAddress);
 
 
 void all_sensor_get(void* pvParameters){
@@ -69,7 +73,7 @@ void all_sensor_get(void* pvParameters){
     vol += (new_flow/60)*mt_delta;
     vol = constrain(vol, 0, 10000);
     sensor_data.volume = vol;
-    delay(10);
+    vTaskDelay(10/portTICK_PERIOD_MS);
     xQueueOverwrite(s_data, (void*)&sensor_data);
   }
 }
@@ -91,30 +95,45 @@ sensor_data_t all_sensor_read(){
 }
 
 void maintain_flow(void* pvParameter){
-  Blower_i2c blower(BlowerAddress);
-  int* inputs = (int*)pvParameter;
-  int req_flow = *inputs;
   sensor_data_t s_read;
-  uint16_t rpm = 0; 
-  //Set initial flow,   
+  uint16_t rpm = 410;                                                        // initial voltage of 0.5v for startup
+
   while(1){
     xQueuePeek(s_data, (void*)&s_read, 0);
-    if((s_read.flow - req_flow) < -1 ) blower.setRPM(++rpm);                 //set tolerance level (-1, 1)
-    else if((s_read.flow - req_flow) > 1) blower.setRPM(--rpm);
-    else break;
-  }     
-  // set flow flag to indicate initial flow achieved
-  flow_flag = true;
-  while(1){
-    xQueuePeek(s_data, (void*)&s_read, 0);
-    if((s_read.flow - req_flow) < -1 ) blower.setRPM(++rpm);                 //set tolerance level (-1, 1)
-    else if((s_read.flow - req_flow) > 1) blower.setRPM(--rpm);
+    if((s_read.flow - req_flow) < -1 ) blower.setRPM(++rpm);                 // set tolerance level (-1, 1)
+    else if((s_read.flow - req_flow) > 1) blower.setRPM(--rpm);              // need to calibrate for step size for write a optimization curve for adjustment 
+    rpm = constrain(rpm, 0, 2045);
   }
 }
 
+typedef struct vol_param_t{
+  int VT;                                                                 //Tidal Volume in ml
+  byte RR;                                                                //Respiratory Rate BPM
+  float Ti;                                                               //Inspiratory time in ms
+}vol_param_t;
+
+bool break_condition = false;
+
 void volume_control(void* pvParameter){
-  int* inputs = (int*)pvParameter;
-  
+  vol_param_t* param = (vol_param_t*)pvParameter;
+  req_flow = ((param->VT)*60)/(param->Ti);                                //Convert to L/min
+  float total_breath = 60000/param->RR;
+  xTaskCreate(maintain_flow, "Maintain flow", 2048, NULL, 5, &flow_handle);
+  vTaskDelay(100/portTICK_PERIOD_MS);
+
+  while(!break_condition){  
+    v1.open();
+    v2.close();
+    vTaskResume(flow_handle);
+    vTaskDelay(param->Ti/portTICK_PERIOD_MS);
+    vTaskSuspend(flow_handle);
+    v1.close();
+    v2.open();
+    vTaskDelay((total_breath-param->Ti)/portTICK_PERIOD_MS);
+  }
+
+  vTaskDelete(flow_handle);
+  vTaskDelete(NULL);
 }
 
 char v1_state, v2_state;
@@ -122,11 +141,12 @@ char v1_state, v2_state;
 void setup() {  
   //Sensor Setup
   Serial.begin(115200);
-  //Serial2.begin(115200, SERIAL_8N1, 16, 17);                            //Use for external usb uart
+  Serial2.begin(115200, SERIAL_8N1, 16, 17);                            //Use for external usb uart
 
   //initialize file system
   if(!SPIFFS.begin(true)){
     Serial.println("An Error has occurred while mounting SPIFFS");
+    Serial2.println("An Error has occurred while mounting SPIFFS");
     return;
   }
 
@@ -140,10 +160,12 @@ void setup() {
   while (WiFi.status() != WL_CONNECTED) {
     delay(1000);
     Serial.println("Connecting to WiFi..");
+    Serial2.println("Connecting to WiFi..");
   }
 
   // Print ESP32 Local IP Address
   Serial.println(WiFi.localIP());
+  Serial2.println(WiFi.localIP());
 
   // Route for root / web page
   server.on("/", HTTP_GET, [](AsyncWebServerRequest *request){
@@ -166,7 +188,6 @@ void setup() {
     request->send_P(200, "text/plain", String(all_sensor_read().oxygen, 3u).c_str());
   });
 
-
   server.on("/valve_1", HTTP_GET, [](AsyncWebServerRequest *request){
     v1.toggle();
     Serial.println("valve 1 toggled");
@@ -176,6 +197,17 @@ void setup() {
     v2.toggle();
     Serial.println("Valve 2 toggles");
     request->send_P(200, "text/plain", String(digitalRead(valve_2)).c_str());
+  });
+
+  server.on("/get", HTTP_GET, [](AsyncWebServerRequest *request){
+    String msg;
+    uint16_t DacVal;
+    msg = request->getParam("DAC")->value();
+    request->send_P(200, "text/html", "response sent");
+    DacVal = msg.toInt();
+    Serial.println(DacVal);
+    Serial2.println(DacVal);
+    blower.setRPM(DacVal);
   });
 
 
@@ -194,4 +226,5 @@ void loop() {
   //   start = millis();
   //   Serial.println("Toggled");
   // }
+
 }

@@ -2,18 +2,22 @@
 
 void sensor_begin(int8_t sda_, int8_t scl_, uint32_t frequency_){
         Wire.begin(sda_, scl_, frequency_);
+        Wire1.begin(33, 32, 100000);
 }
 
 
 Flow_sensor::Flow_sensor(uint8_t _address) : address(_address), flow_sign(0), polynomial(0x31), crc_error(0){}
 
+/*!
+*@brief begin sensor and set on continuous measurement
+*/
 void Flow_sensor::flow_begin(){
     //soft reset
     Wire.beginTransmission(address);
     Wire.write(0x20);
     Wire.write(0x00);
     Wire.endTransmission();
-    delay(10);
+    vTaskDelay(10/portTICK_PERIOD_MS);
 
     Wire.beginTransmission(address);
     Wire.write(0x31);  // read serial number
@@ -49,6 +53,10 @@ uint8_t Flow_sensor::CRC_prim (uint8_t x, uint8_t crc) {
     return crc;
 }
 
+/*!
+*@brief get processed raw data
+*@return 
+*/
 int16_t Flow_sensor::getReading(){
     int16_t raw = getRAWReading();
     if(raw == -1){
@@ -59,6 +67,10 @@ int16_t Flow_sensor::getReading(){
     return raw;
 }
 
+/*!
+*@brief get raw flow sensor data
+*@return reading in L/min
+*/
 float Flow_sensor::getRAWReading(){
     if(3 == Wire.requestFrom(address, 3)){
         uint8_t crc = 0;
@@ -188,9 +200,9 @@ void Blower_i2c::setRPM(uint16_t val, bool writeEEPROM){
     }
     packet[1] = val >> 4;        // Upper data bits (D11.D10.D9.D8.D7.D6.D5.D4)
     packet[2] = (val & 15) << 4; // Lower data bits (D3.D2.D1.D0.x.x.x.x)
-    Wire.beginTransmission(address);
-    Wire.write(packet, 3);
-    Wire.endTransmission();
+    Wire1.beginTransmission(address);
+    Wire1.write(packet, 3);
+    Wire1.endTransmission();
 
 }
 
@@ -201,9 +213,9 @@ void Blower_i2c::start(){
     packet[0] = 0x40;
     packet[1] = val >> 4;        // Upper data bits (D11.D10.D9.D8.D7.D6.D5.D4)
     packet[2] = (val & 15) << 4; // Lower data bits (D3.D2.D1.D0.x.x.x.x)
-    Wire.beginTransmission(address);
-    Wire.write(packet, 3);
-    Wire.endTransmission();
+    Wire1.beginTransmission(address);
+    Wire1.write(packet, 3);
+    Wire1.endTransmission();
 
 }
 
@@ -215,11 +227,9 @@ void Blower_i2c::stop(){
 
     packet[1] = val >> 4;        // Upper data bits (D11.D10.D9.D8.D7.D6.D5.D4)
     packet[2] = (val & 15) << 4; // Lower data bits (D3.D2.D1.D0.x.x.x.x)
-    Wire.beginTransmission(address);
-    Wire.write(packet, 3);
-    Wire.endTransmission();
-
-
+    Wire1.beginTransmission(address);
+    Wire1.write(packet, 3);
+    Wire1.endTransmission();
 }
 
 

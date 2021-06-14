@@ -17,7 +17,7 @@
 #define ADS1115ADDRESS 0x48
 #define flowAddress 0x40
 #define pressureAddr 0x28
-
+#define BlowerAddress 0x00
 // Replace with your network credentials
 const char* ssid = "abcd";
 const char* password = "qwertyui";
@@ -27,6 +27,8 @@ AsyncWebServer server(80);
 
 SemaphoreHandle_t mutex;
 QueueHandle_t s_data;
+TaskHandle_t flow_handle = NULL;
+bool flow_flag = false;
 
 
 typedef struct sensor_data_t{
@@ -88,8 +90,31 @@ sensor_data_t all_sensor_read(){
   return s_read;
 }
 
-void volume_control(void* pvParameter){
+void maintain_flow(void* pvParameter){
+  Blower_i2c blower(BlowerAddress);
+  int* inputs = (int*)pvParameter;
+  int req_flow = *inputs;
+  sensor_data_t s_read;
+  uint16_t rpm = 0; 
+  //Set initial flow,   
+  while(1){
+    xQueuePeek(s_data, (void*)&s_read, 0);
+    if((s_read.flow - req_flow) < -1 ) blower.setRPM(++rpm);                 //set tolerance level (-1, 1)
+    else if((s_read.flow - req_flow) > 1) blower.setRPM(--rpm);
+    else break;
+  }     
+  // set flow flag to indicate initial flow achieved
+  flow_flag = true;
+  while(1){
+    xQueuePeek(s_data, (void*)&s_read, 0);
+    if((s_read.flow - req_flow) < -1 ) blower.setRPM(++rpm);                 //set tolerance level (-1, 1)
+    else if((s_read.flow - req_flow) > 1) blower.setRPM(--rpm);
+  }
+}
 
+void volume_control(void* pvParameter){
+  int* inputs = (int*)pvParameter;
+  
 }
 
 char v1_state, v2_state;
